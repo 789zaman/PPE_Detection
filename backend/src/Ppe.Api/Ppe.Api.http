@@ -1,0 +1,10 @@
+@Ppe.Api_HostAddress = http://localhost:5288
+
+GET {{Ppe.Api_HostAddress}}/health
+Accept: application/json
+
+###
+POST {{Ppe.Api_HostAddress}}/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "admin@engro.com", "password": "your-password" }

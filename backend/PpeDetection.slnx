@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Ppe.Api/Ppe.Api.csproj" />
+    <Project Path="src/Ppe.Application/Ppe.Application.csproj" />
+    <Project Path="src/Ppe.Domain/Ppe.Domain.csproj" />
+    <Project Path="src/Ppe.Infrastructure/Ppe.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Ppe.Tests/Ppe.Tests.csproj" />
+  </Folder>
+</Solution>

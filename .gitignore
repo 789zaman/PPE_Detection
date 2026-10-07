@@ -1,0 +1,11 @@
+# PPE Detection
+.env
+backend/**/bin/
+backend/**/obj/
+backend/**/data/
+backend/**/*.db
+ai-worker/**/__pycache__/
+ai-worker/.venv/
+data/
+*.pt
+!ai-worker/models/**/weights/.gitkeep

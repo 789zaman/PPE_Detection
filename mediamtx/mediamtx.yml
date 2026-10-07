@@ -1,0 +1,28 @@
+# Global settings
+logLevel: info
+api: yes
+apiAddress: :9997
+
+rtspAddress: :8554
+webrtcAddress: :8889
+hlsAddress: :8888
+playback: no
+
+# Browser playback (WHEP) and AI ingest (RTSP) share the same path name.
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
+
+authInternalUsers:
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: publish
+      - action: read
+      - action: playback
+      - action: api
+
+paths:
+  cam-live-01:
+    source: publisher
+    rtspTransport: tcp

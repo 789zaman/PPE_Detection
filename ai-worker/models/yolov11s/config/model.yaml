@@ -1,0 +1,35 @@
+name: yolov11s
+family: YOLO11
+variant: s
+task: detect
+weights: weights/best.pt
+imgsz: 960
+confidence: 0.25
+iou: 0.45
+device: cpu
+# Class order is the id map. Business logic resolves ids from these names.
+classes:
+  - person
+  - goggles
+  - helmet
+  - arc_shield
+  - arc_suit
+  - arc_gloves
+  - boots
+class_aliases:
+  arc_shield: arc_flash_shield
+  arc_flash_shield: arc_flash_shield
+  safety_glasses: goggles
+  glasses: goggles
+  vest: arc_flash_shield
+  safety_vest: arc_flash_shield
+  hardhat: helmet
+  no-hardhat: helmet
+thresholds:
+  person: 0.25
+  helmet: 0.20
+  goggles: 0.15
+  arc_suit: 0.20
+  arc_flash_shield: 0.15
+  arc_gloves: 0.15
+  boots: 0.20

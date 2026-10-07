@@ -1,0 +1,203 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ppe}
+      POSTGRES_USER: ${POSTGRES_USER:-ppe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ppe_dev_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ppe} -d ${POSTGRES_DB:-ppe}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [ppe-network]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks: [ppe-network]
+    restart: unless-stopped
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js", "-m", "8222", "-sd", "/data"]
+    volumes:
+      - nats_data:/data
+    ports:
+      - "${NATS_PORT:-4222}:4222"
+      - "${NATS_MONITOR_PORT:-8222}:8222"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [ppe-network]
+    restart: unless-stopped
+
+  mediamtx:
+    image: bluenviron/mediamtx:1.11.3
+    volumes:
+      - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
+      - mediamtx_data:/data
+    ports:
+      - "${MEDIAMTX_RTSP_PORT:-8554}:8554"
+      - "${MEDIAMTX_WEBRTC_PORT:-8889}:8889"
+      - "${MEDIAMTX_HLS_PORT:-8888}:8888"
+      - "${MEDIAMTX_API_PORT:-9997}:9997"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9997/v3/config/global/get"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [ppe-network]
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB:-ppe};Username=${POSTGRES_USER:-ppe};Password=${POSTGRES_PASSWORD:-ppe_dev_password}
+      Database__Provider: Postgres
+      Database__MigrateOnStartup: "true"
+      Jwt__Key: ${JWT_KEY:-dev-only-change-me-please-use-32-chars!}
+      Jwt__Issuer: ${JWT_ISSUER:-ppe}
+      Jwt__Audience: ${JWT_AUDIENCE:-ppe}
+      Cors__Origins: ${CORS_ORIGINS:-http://localhost:4200}
+      Nats__Enabled: "true"
+      Nats__Url: nats://nats:4222
+      MediaMtx__ApiBase: http://mediamtx:9997
+      MediaMtx__RtspInternalBase: rtsp://mediamtx:8554
+      MediaMtx__WebrtcPublicBase: ${MEDIAMTX_WEBRTC_PUBLIC_BASE:-http://127.0.0.1:8889}
+      Media__Root: /data/media
+      Internal__Token: ${INTERNAL_TOKEN:-dev-internal-token}
+    volumes:
+      - ppe_media:/data/media
+    ports:
+      - "${BACKEND_PORT:-5288}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 25s
+    networks: [ppe-network]
+    restart: unless-stopped
+
+  ai-worker:
+    build:
+      context: ./ai-worker
+    environment:
+      AI_MODE: ${AI_MODE:-mock}
+      MODEL_NAME: ${MODEL_NAME:-yolov11s}
+      MODEL_PATH: ${MODEL_PATH:-}
+      MODELS_DIR: /app/models
+      NATS_URL: nats://nats:4222
+      NATS_ENABLED: "true"
+      HEALTH_PORT: "8081"
+      BACKEND_CONFIG_URL: http://backend:8080/internal/ai/configuration
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-dev-internal-token}
+      MEDIA_ROOT: /data/media
+      WORKER_ID: ${AI_WORKER_ID:-ai-worker-01}
+      IMGSZ: ${IMGSZ:-960}
+      CONFIDENCE: ${CONFIDENCE:-0.25}
+      IOU: ${IOU:-0.45}
+      DEVICE: ${DEVICE:-cpu}
+      MEDIAMTX_RTSP_BASE: rtsp://mediamtx:8554
+      FRAME_INTERVAL_SECONDS: ${FRAME_INTERVAL_SECONDS:-0.5}
+    volumes:
+      - ./ai-worker/models:/app/models
+      - ppe_media:/data/media
+    ports:
+      - "${AI_HEALTH_PORT:-8081}:8081"
+    depends_on:
+      nats:
+        condition: service_healthy
+      mediamtx:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks: [ppe-network]
+    restart: unless-stopped
+
+  ai-worker-gpu:
+    profiles: ["gpu"]
+    build:
+      context: ./ai-worker
+    environment:
+      AI_MODE: ${AI_MODE:-production}
+      MODEL_NAME: ${MODEL_NAME:-yolov11s}
+      MODELS_DIR: /app/models
+      NATS_URL: nats://nats:4222
+      HEALTH_PORT: "8081"
+      BACKEND_CONFIG_URL: http://backend:8080/internal/ai/configuration
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-dev-internal-token}
+      MEDIA_ROOT: /data/media
+      DEVICE: "0"
+      MEDIAMTX_RTSP_BASE: rtsp://mediamtx:8554
+    volumes:
+      - ./ai-worker/models:/app/models
+      - ppe_media:/data/media
+    gpus: all
+    depends_on:
+      nats:
+        condition: service_healthy
+      mediamtx:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks: [ppe-network]
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: "./engro PPE"
+    ports:
+      - "${FRONTEND_PORT:-4200}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 20s
+      timeout: 5s
+      retries: 8
+    networks: [ppe-network]
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  nats_data:
+  mediamtx_data:
+  ppe_media:
+
+networks:
+  ppe-network:
+    name: ppe-network

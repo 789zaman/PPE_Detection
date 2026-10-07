@@ -1,0 +1,5 @@
+pydantic>=2.9
+pydantic-settings>=2.5
+pyyaml>=6.0
+nats-py>=2.9
+opencv-python-headless>=4.10

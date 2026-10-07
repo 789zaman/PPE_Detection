@@ -1,0 +1,25 @@
+{
+  "/api": {
+    "target": "http://localhost:5288",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "info"
+  },
+  "/hubs": {
+    "target": "http://localhost:5288",
+    "secure": false,
+    "changeOrigin": true,
+    "ws": true,
+    "logLevel": "info"
+  },
+  "/snapshots": {
+    "target": "http://localhost:5288",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/captures": {
+    "target": "http://localhost:5288",
+    "secure": false,
+    "changeOrigin": true
+  }
+}

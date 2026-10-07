@@ -1,0 +1,2 @@
+-- Default plant zone + live camera are inserted by the backend DbInitializer.
+-- Optional operator seed (do not put production passwords here).
